@@ -78,7 +78,7 @@ class ScreenShot_Fast(object):
                         win32con.SRCCOPY)
         im = self.dataBitMap.GetBitmapBits(True)
         screenshot_lock.release()
-        print(i)
+        # print(i)
         return im, i
     
     def coverfrom(self, im, _cursor, i):
@@ -101,9 +101,10 @@ class ScreenShot_Fast(object):
             cursor = _cursor[:h, :w]
             img[y:y + h, x:x + w] = img[y:y + h, x:x + w] + cursor / 2
         except Exception as e:
-            print(e)
-        cv2.imwrite('/'.join([name, '{i}.jpg'.format(i=i)]), img)
-        print(i)
+            pass
+            # print(e)
+        cv2.imwrite('/'.join([root_, name, '{i}.jpg'.format(i=i)]), img)
+        # print(i)
 
 
 def take_screenshot_fast(hwnd):
@@ -140,53 +141,69 @@ def take_screenshot_fast(hwnd):
     return img, (x, y, w, h)
 
 
-def main(max_count, fps, name='default'):
+def main(max_count, fps, name='default', is_screenshot=True, is_covertvideo=True):
     _cursor = cv2.imread('cursor.png', cv2.IMREAD_COLOR)
     _cursor = np.array(_cursor)
-    if not os.path.exists(name):
-        os.mkdir(name)
+    if not os.path.exists('/'.join([root_, name])):
+        os.mkdir('/'.join([root_, name]))
     with ScreenShot_Fast(0) as screenshot:
-        # with futures.ThreadPoolExecutor(max_workers=5) as executor:
-        #
-        #     for i in range(max_count):
-        #         im, i = screenshot.process(i)
-        #         executor.submit(screenshot.coverfrom, im, _cursor, i)
-        #
-        video_outstream = cv2.VideoWriter('/'.join([root_, '{name}.mp4'.format(name=name)]),
-                                          cv2.VideoWriter_fourcc(*'mp4v'),
-                                          fps,
-                                          (screenshot.w, screenshot.h))
-        filelist = sorted(os.listdir('/'.join([root_, name])),
-                          key=lambda item: int(re.findall('\d+', item)[0]))
-        for f in filelist:
-            img = cv2.imread('/'.join([root_, name, f]))
-            img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
-            video_outstream.write(img)
-            print(f)
-        # def loadimg(path, i):
-        #     return cv2.imread(path), i
-        # temp_img = dict()
-        # with futures.ThreadPoolExecutor(max_workers=40) as exe:
-        #     future_items = [exe.submit(loadimg, '/'.join([name, f]), i)
-        #                     for i, f in enumerate(filelist)]
-        #     for j, f in enumerate(futures.as_completed(future_items)):
-        #         try:
-        #             img, i = f.result()
-        #             temp_img[i] = img
-        #             print(i)
-        #         except Exception as e:
-        #             pass
-        # for i, img in temp_img.items():
-        #     video_outstream.write(img)
-        video_outstream.release()
+        if is_screenshot:
+            print('开始截取屏幕.....预计用时: ', max_count/30, 's')
+            b = time.time()
+            with futures.ThreadPoolExecutor(max_workers=5) as executor:
+    
+                for i in range(max_count):
+                    im, i = screenshot.process(i)
+                    executor.submit(screenshot.coverfrom, im, _cursor, i)
+            print('完成屏幕截取.....实际用时: ', time.time()-b, 's')
+            
+        if is_covertvideo:
+            print('开始生产视频')
+            b = time.time()
+            video_outstream = cv2.VideoWriter('/'.join([root_, '{name}.mp4'.format(name=name)]),
+                                              cv2.VideoWriter_fourcc(*'mp4v'),
+                                              fps,
+                                              (screenshot.w, screenshot.h))
+            filelist = sorted(os.listdir('/'.join([root_, name])),
+                              key=lambda item: int(re.findall('\d+', item)[0]))
+            for f in filelist:
+                img = cv2.imread('/'.join([root_, name, f]))
+                img = cv2.cvtColor(img, cv2.COLOR_BGRA2RGB)
+                video_outstream.write(img)
+                # print(f)
+            # def loadimg(path, i):
+            #     return cv2.imread(path), i
+            # temp_img = dict()
+            # with futures.ThreadPoolExecutor(max_workers=40) as exe:
+            #     future_items = [exe.submit(loadimg, '/'.join([name, f]), i)
+            #                     for i, f in enumerate(filelist)]
+            #     for j, f in enumerate(futures.as_completed(future_items)):
+            #         try:
+            #             img, i = f.result()
+            #             temp_img[i] = img
+            #             print(i)
+            #         except Exception as e:
+            #             pass
+            # for i, img in temp_img.items():
+            #     video_outstream.write(img)
+            video_outstream.release()
+            print('视频生成完成...', time.time()-b, 's')
     print('finish')
 
 
 if __name__ == '__main__':
-    max_count = 18000
-    fps = 30
-    name = 'test'
+    print(sys.argv)
+    if len(sys.argv) < 5:
+        print('参数不够')
+    
+    max_count = int(sys.argv[1])  # 18000
+    fps = int(sys.argv[2])  # 30
+    name = sys.argv[3]  # 'test'
+    is_screenshot = sys.argv[4] == 'True'  # True
+    is_covertvideo = sys.argv[5] == 'True'  # True
     b = time.time()
     main(max_count=max_count,
-         fps=fps,name=name)
+         fps=fps,name=name,
+         is_screenshot=is_screenshot,
+         is_covertvideo=is_covertvideo)
     print('time spend: ', time.time()-b)
